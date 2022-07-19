@@ -30,12 +30,12 @@ contract ERC20 is IERC20 {
     }
 
     modifier enoughTokens(address _form, uint _amount) {
-        require(balanceOf(_form) >= _amount, "not enough tokens")
+        require(balanceOf(_form) >= _amount, "not enough tokens");
         _;
     }
 
     modifier onlyOwner() {
-        require(msg.sender == owner, "not an owner")
+        require(msg.sender == owner, "not an owner");
         _;
     }
 
@@ -54,7 +54,7 @@ contract ERC20 is IERC20 {
         _beforeTokenTransfer(msg.sender, to, amount);
         balances[msg.sender] -= amount;
         balances[to] += amount;
-        emit Transfer(msg.sender, to, amount)
+        emit Transfer(msg.sender, to, amount);
     }
 
     function mint(uint amount, address shop) public onlyOwner {
@@ -66,8 +66,8 @@ contract ERC20 is IERC20 {
     }
 
     function burn(address _from, uint amount) public onlyOwner {
-        _beforeTokenTransfer(_form, address(0), amount);
-        balances[_form] -= amount;
+        _beforeTokenTransfer(_from, address(0), amount);
+        balances[_from] -= amount;
         totalTokens -= amount;
     }
 
@@ -76,12 +76,12 @@ contract ERC20 is IERC20 {
     }
 
     function approve(address spender, uint amount) public {
-        _approve(msg,sender, spender, amount)
+        _approve(msg.sender, spender, amount);
     }
 
     function _approve(address sender, address spender, uint amount ) internal virtual {
-        allowance[sender][spender] = amount;
-        emit Approve(sender, spender, amount)
+        allowances[sender][spender] = amount;
+        emit Approve(sender, spender, amount);
     }
 
     function transferFrom(address sender, address recipient, uint amount) public enoughTokens(sender, amount) { 
@@ -101,7 +101,7 @@ contract MCSToken is ERC20 {
     constructor(address shop) ERC20("MCSToken", "MCS", 20, shop) {}
 
     function _beforeTokenTransfer(address from, address to, uint amount) internal override {
-        require(from != address(0))
+        require(from != address(0));
     }
 }
 
@@ -114,5 +114,41 @@ contract MShop {
 
     constructor() {
         token = new MCSToken(address(this));
+        owner = payable(msg.sender);
+
     }
+
+    modifier onlyOwner() {
+        require(msg.sender == owner, "not an owner");
+        _;
+    }
+
+    function sell(uint _amountToSell) external {
+        require(_amountToSell > 0 && token.balanceOf(msg.sender) >= _amountToSell, "incorrect amount");
+
+        uint allowance = token.allowance(msg.sender, address(this));
+        require(allowance >= _amountToSell, "check allowance");
+
+        token.transferFrom(msg.sender,address(this), _amountToSell);
+
+        payable(msg.sender).transfer(_amountToSell);  
+
+        emit Sold(_amountToSell, msg.sender);
+    }
+
+    receive() external payable {
+        uint tokensToBuy = msg.value;
+        require(tokensToBuy > 0, "not enough pounds");
+
+        require(tokenBalance() >= tokensToBuy, "not enought tokens");
+
+        token.transfer(msg.sender, tokensToBuy);
+        emit Bought(tokensToBuy, msg.sender);
+    }
+
+    function tokenBalance() public view returns(uint) {
+        return token.balanceOf(address(this));
+    }
+
+    // TODO Написать функцию, которая позволит владельцу списать средства за продажу токенов.
 }
